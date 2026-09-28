@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Expert Bar — Summit 2026 (Web POC)</title>
+  <script type="module" crossorigin src="./assets/index-BpryBwlT.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CfB9rgge.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <!-- Login (mobile-first) -->
+    <div id="picker" class="overlay">
+      <div class="picker-card login-card">
+        <div class="brand-row">
+          <span class="cyan">rev.io</span>
+          <span class="dim">SUMMIT 2026</span>
+        </div>
+        <h1>Join Expert Bar</h1>
+        <p class="sub">Enter your name, pick an avatar, then walk the hall on your phone.</p>
+
+        <label class="field" for="display-name">
+          <span class="field-label">Display name</span>
+          <input id="display-name" type="text" name="displayName" autocomplete="nickname"
+            placeholder="Your name" maxlength="24" enterkeyhint="next" required />
+        </label>
+
+        <label class="field" for="demo-code">
+          <span class="field-label">Demo code</span>
+          <input id="demo-code" type="text" name="demoCode" autocomplete="off"
+            placeholder="DEMO" maxlength="32" value="DEMO" enterkeyhint="done" />
+        </label>
+
+        <p class="field-label avatar-section-label">Avatar</p>
+        <div id="avatar-grid" class="avatar-grid"></div>
+
+        <p id="login-error" class="login-error hidden" role="alert"></p>
+
+        <button id="enter-btn" class="primary" type="button" disabled>Enter Expert Bar</button>
+        <p class="fineprint">Web 3D buy-in POC · not Unreal fidelity</p>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="hint" class="hint">Walk to Station A or D · tap Interact</div>
+      <div id="joystick-zone">
+        <div id="joystick-base"><div id="joystick-knob"></div></div>
+      </div>
+      <button id="interact-btn" class="interact" disabled>Interact</button>
+      <div id="station-label" class="station-label hidden"></div>
+    </div>
+
+    <!-- Station UI panel -->
+    <div id="station-panel" class="overlay hidden">
+      <div class="panel-card">
+        <div class="panel-head">
+          <span id="panel-title">Station</span>
+          <button id="panel-close" class="ghost">Close ✕</button>
+        </div>
+        <img id="panel-img" alt="Revii mock UI" />
+        <p id="panel-blurb" class="panel-blurb"></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
