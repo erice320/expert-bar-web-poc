@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Expert Bar — Summit 2026 (Web POC)</title>
-  <script type="module" crossorigin src="./assets/index-C6mVm6nT.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BYWqfNSt.css">
+  <title>Expert Bar · stream.revioai.bot</title>
+  <meta name="theme-color" content="#0A141F" />
+  <meta name="description" content="Expert Bar phone-playable web POC — walk the Summit hall, Stations A/D, third-person OTS." />
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <div id="app">
@@ -19,8 +20,10 @@
         <div class="brand-row">
           <span class="cyan">rev.io</span>
           <span class="dim">SUMMIT 2026</span>
+          <span class="live-pill" title="Live on stream.revioai.bot">LIVE</span>
         </div>
-        <h1>Join Expert Bar</h1>
+        <h1>Expert Bar</h1>
+        <p class="host-line">stream.revioai.bot · phone OTS demo</p>
         <p class="sub">Enter your name, pick an avatar, then walk the hall on your phone.</p>
 
         <label class="field" for="display-name">
@@ -41,12 +44,13 @@
         <p id="login-error" class="login-error hidden" role="alert"></p>
 
         <button id="enter-btn" class="primary" type="button" disabled>Enter Expert Bar</button>
-        <p class="fineprint">Web 3D buy-in POC · photo-real hall target · not Unreal Phase 2</p>
+        <p class="fineprint">stream.revioai.bot · Web 3D buy-in · photo-real hall · Unreal Pixel Streaming next</p>
       </div>
     </div>
 
     <!-- HUD -->
     <div id="hud" class="hidden">
+      <div id="host-badge" class="host-badge">stream.revioai.bot</div>
       <div id="hint" class="hint">Left stick move · Right drag look · Stations A/D</div>
       <div id="joystick-zone">
         <div id="joystick-base"><div id="joystick-knob"></div></div>
@@ -76,5 +80,6 @@
       </div>
     </div>
   </div>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
