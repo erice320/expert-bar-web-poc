@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { AVATARS, createAvatarMesh, animateWalk } from './avatars.js';
+import { AVATARS, createAvatarMesh, animateWalk, upgradeAvatar, placeProps } from './avatars.js';
+import { CHARACTER_SLOTS } from './models/manifest.js';
+import { modelStatus, preload, tickMixers } from './models/loader.js';
 import { Joystick, Keyboard, DPad, LookPad } from './joystick.js';
 import { buildWorld } from './world.js';
 
@@ -18,6 +20,13 @@ const panelTitle = document.getElementById('panel-title');
 const panelImg = document.getElementById('panel-img');
 const panelBlurb = document.getElementById('panel-blurb');
 const panelClose = document.getElementById('panel-close');
+
+const VERSION = __APP_VERSION__;
+console.info(`[eb] Expert Bar v${VERSION}`);
+const hostBadge = document.getElementById('host-badge');
+if (hostBadge) hostBadge.textContent = `stream.revioai.bot · v${VERSION}`;
+const fineprint = document.querySelector('.fineprint');
+if (fineprint) fineprint.textContent = `${fineprint.textContent} · v${VERSION}`;
 
 const LS_NAME = 'eb_display_name';
 const LS_AVATAR = 'eb_avatar';
@@ -70,6 +79,7 @@ for (const a of AVATARS) {
   `;
   btn.addEventListener('click', () => {
     selectedId = a.id;
+    preload(a.id, CHARACTER_SLOTS[a.id]);
     document.querySelectorAll('.avatar-opt').forEach((el) => el.classList.remove('selected'));
     btn.classList.add('selected');
     showLoginError('');
@@ -277,6 +287,7 @@ function startGame() {
   player.position.set(0, 0, 10);
   player.rotation.y = 0; // face -Z toward Expert Bar ring
   scene.add(player);
+  const playerUpgrade = upgradeAvatar(player, playerPreset).catch(() => null);
 
   // Other "users" — distinct presets excluding player's
   const others = AVATARS.filter((a) => a.id !== playerPreset.id);
@@ -290,8 +301,15 @@ function startGame() {
     const mesh = createAvatarMesh(spec.preset, { label: true, textureLoader });
     mesh.position.copy(spec.path(0));
     scene.add(mesh);
-    npcs.push({ mesh, path: spec.path, speed: spec.speed, t: Math.random() * 10, idle: Math.random() > 0.5 });
+    npcs.push({ mesh, path: spec.path, speed: spec.speed, t: Math.random() * 10, idle: Math.random() > 0.5, preset: spec.preset });
   }
+
+  // Player GLB first; NPC GLBs + props start once it settles (or after 2.5 s). Never blocks login.
+  const startDeferred = () => {
+    for (const n of npcs) upgradeAvatar(n.mesh, n.preset, `${n.preset.id}#npc`).catch(() => null);
+    placeHallProps(world);
+  };
+  Promise.race([playerUpgrade, new Promise((r) => setTimeout(r, 2500))]).then(startDeferred);
 
   // Independent orbit camera behind player (face -Z → camYaw 0)
   camYaw = 0;
@@ -311,6 +329,25 @@ function startGame() {
     if (!player) return;
     player.position.set(x, 0, z);
   };
+}
+
+function placeHallProps(world) {
+  const chairFace = { faceX: 0, faceZ: -2 };
+  placeProps(
+    'PROP-CHAIR',
+    [
+      [4.15, -0.89],
+      [4.15, -3.11],
+      [-4.15, -0.89],
+      [-4.15, -3.11],
+    ].map(([x, z]) => ({ parent: scene, x, z, ...chairFace }))
+  ).catch(() => {});
+  const planters = [];
+  for (const st of world.stations) {
+    if (st.id !== 'A' && st.id !== 'D') continue;
+    for (const x of [-1.75, 1.75]) planters.push({ parent: st.group, x, z: -0.35, faceX: x, faceZ: 0.65 });
+  }
+  placeProps('PROP-PLANTER', planters).catch(() => {});
 }
 
 function circlePath(cx, cz, r, dir) {
@@ -379,7 +416,7 @@ function updatePlayer(dt, t) {
       player.rotation.y = approachAngle(player.rotation.y, targetYaw, 0.2);
     }
   }
-  animateWalk(player, moving, t);
+  animateWalk(player, moving, t, moving ? 3.6 : 0);
 
   // Independent OTS orbit: behind player by camYaw / camPitch (NOT player.rotation.y)
   const pitchLift = Math.sin(camPitch) * 1.2;
@@ -426,6 +463,10 @@ function updatePlayer(dt, t) {
     joy: { ...joystick.vector, active: joystick.active },
     lookActive: lookPad.active,
     near: nearStation && nearStation.id,
+    version: VERSION,
+    models: { ...modelStatus },
+    tris: renderer.info.render.triangles,
+    calls: renderer.info.render.calls,
     stations: stations.map((s) => {
       const v = new THREE.Vector3();
       s.group.getWorldPosition(v);
@@ -456,7 +497,8 @@ function updateNpcs(dt, t) {
         n.mesh.rotation.y = Math.atan2(dx, dz);
       }
     }
-    animateWalk(n.mesh, moving, t + n.t);
+    const stepSpeed = moving && dt > 0 ? Math.hypot(n.mesh.position.x - prev.x, n.mesh.position.z - prev.z) / dt : 0;
+    animateWalk(n.mesh, moving, t + n.t, stepSpeed);
   }
 }
 
@@ -473,6 +515,7 @@ function tick() {
     else animateWalk(player, false, t);
     updateNpcs(dt, t);
   }
+  tickMixers(dt);
   renderer.render(scene, camera);
 }
 tick();

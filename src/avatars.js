@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CHARACTER_SLOTS, PROP_SLOTS } from './models/manifest.js';
+import { instantiate } from './models/loader.js';
 
 /** Avatar presets matching GAMEPLAY_OTS_v02 AV-A–D spirit */
 export const AVATARS = [
@@ -140,6 +142,7 @@ export function createAvatarMesh(preset, { label = true, displayName = null, tex
     shadowProxy.castShadow = true;
     shadowProxy.frustumCulled = false;
     root.add(shadowProxy);
+    root.userData.shadowProxy = shadowProxy;
     root.add(plate);
     root.userData.photoPlate = plate;
 
@@ -401,10 +404,78 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-export function animateWalk(avatar, moving, t) {
+/**
+ * Swap the billboard for a GLB when one loads. Billboard stays on any failure.
+ * statusKey: preset.id for the player, `${preset.id}#npc` for NPCs.
+ */
+export function upgradeAvatar(group, preset, statusKey = preset.id) {
+  const slot = CHARACTER_SLOTS[preset.id];
+  if (!slot) return Promise.resolve(null);
+  return instantiate(statusKey, slot).then((res) => {
+    if (!res) return null;
+    const u = group.userData;
+    if (u.photoPlate) u.photoPlate.visible = false;
+    if (u.body) u.body.visible = false;
+    if (u.shadowProxy) u.shadowProxy.visible = false;
+    res.object.name = 'model3d';
+    group.add(res.object);
+    u.model3d = res;
+    if (res.idleAction) {
+      res.idleAction.setEffectiveWeight(1);
+      res.walkAction.setEffectiveWeight(0);
+    }
+    return res;
+  });
+}
+
+/**
+ * placements: [{ parent, x, z, faceX, faceZ }] in the parent's local space.
+ * Missing/failed asset => props simply absent.
+ */
+export function placeProps(key, placements) {
+  return instantiate(key, PROP_SLOTS[key]).then((res) => {
+    if (!res) return;
+    placements.forEach((p, i) => {
+      const o = i === 0 ? res.object : res.object.clone(true);
+      o.position.set(p.x, 0, p.z);
+      o.rotation.y = Math.atan2(p.faceX - p.x, p.faceZ - p.z);
+      p.parent.add(o);
+    });
+  });
+}
+
+function animateModel(m, moving, t, speed) {
+  const pivot = m.object;
+  if (m.mixer && m.walkAction) {
+    const stepScale = THREE.MathUtils.clamp((speed || 1.4) / m.walkClipSpeed, 0.6, 2.4);
+    if (m.idleAction) {
+      const w = THREE.MathUtils.lerp(m.walkAction.getEffectiveWeight(), moving ? 1 : 0, 0.2);
+      m.walkAction.setEffectiveWeight(w);
+      m.idleAction.setEffectiveWeight(1 - w);
+      m.walkAction.timeScale = stepScale;
+    } else {
+      m.walkAction.setEffectiveWeight(1);
+      m.walkAction.timeScale = moving ? stepScale : THREE.MathUtils.lerp(m.walkAction.timeScale, 0, 0.25);
+    }
+    pivot.position.y = 0;
+    pivot.scale.y = 1 + (moving ? 0 : Math.sin(t * 1.6) * 0.004);
+  } else {
+    pivot.position.y = moving ? Math.abs(Math.sin(t * 9)) * 0.035 : 0;
+    pivot.rotation.z = moving ? Math.sin(t * 9) * 0.035 : Math.sin(t * 1.2) * 0.008;
+    pivot.rotation.x = moving ? 0.05 : 0;
+  }
+}
+
+/** speed: ground speed in m/s (optional; drives GLB walk playback rate). */
+export function animateWalk(avatar, moving, t, speed) {
+  const model = avatar.userData.model3d;
+  if (model) {
+    animateModel(model, moving, t, speed);
+    return;
+  }
   const amp = moving ? 0.45 : 0.04;
-  const speed = moving ? 10 : 2;
-  const swing = Math.sin(t * speed) * amp;
+  const freq = moving ? 10 : 2;
+  const swing = Math.sin(t * freq) * amp;
   if (avatar.userData.leftLeg) {
     avatar.userData.leftLeg.rotation.x = swing;
     avatar.userData.rightLeg.rotation.x = -swing;

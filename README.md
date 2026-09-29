@@ -83,3 +83,12 @@ Repo: https://github.com/erice320/expert-bar-web-poc (gh-pages). Deploy to dropl
 **Panel close fix deploy:** commit `d9bbc62` — `#station-panel` z-index above look-zone so Close receives touches; pointer/touch close, overlay tap, Escape/E/Space; movement resumes.
 
 **Photo-real fidelity deploy:** hall + avatar billboards + Expert Bar hero plate (see CHANGELOG 2026-09-28 ~11:10 CT).
+
+## v0.3.0 — GLB avatars/props (loader + fallback)
+
+- Characters `AV-A..D` and props (`PROP-CHAIR` x4, `PROP-PLANTER` x4) load from `public/models/` (slots and filenames: `public/models/README.md`).
+- Billboards remain the instant fallback; any missing/invalid/slow GLB leaves the v0.2 look (props absent). No GLBs are shipped yet (Higgsfield generation is a follow-up), so v0.3.0 currently renders identically to v0.2 apart from the version badge.
+- URL switches: `?models=0` (no GLB requests), `?modelFail=AV-B,PROP-CHAIR` (force fallback).
+- Debug: `window.__eb` has `version`, `models`, `tris`, `calls`.
+- Version comes from `package.json` (`__APP_VERSION__`); also update `public/version.json`.
+- Plan: `PLAN.md` / `CHECKLIST.md`. Deploy: `DEPLOY.md`.

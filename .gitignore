@@ -3,3 +3,4 @@ dist/
 shots/
 assets-src/higgsfield/raw/
 .wrangler/
+test-models/
