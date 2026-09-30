@@ -5,6 +5,7 @@ import { modelStatus, preload, tickMixers } from './models/loader.js';
 import { Joystick, Keyboard, DPad, LookPad } from './joystick.js';
 import { buildWorld, HALL } from './world.js';
 import { ColliderWorld, PLAYER } from './collision.js';
+import { armClearance, stepArm, placeCamera } from './camera-rig.js';
 import { buildColliders } from './colliders.js';
 import { createColliderDebug } from './collider-debug.js';
 import { getStationPlaylist, embedUrl } from './station-videos.js';
@@ -270,6 +271,8 @@ const keyboard = new Keyboard();
 const clock = new THREE.Clock();
 const camLook = new THREE.Vector3();
 const desiredCam = new THREE.Vector3();
+const camFree = new THREE.Vector3(); // unconstrained (lagged) orbit position; camera.position is this run through the spring arm
+let camArm;
 const moveDir = new THREE.Vector3();
 const forwardFlat = new THREE.Vector3();
 const rightFlat = new THREE.Vector3();
@@ -349,9 +352,10 @@ function startGame() {
     player.position.y + CAM_HEIGHT + Math.sin(camPitch) * 1.2,
     player.position.z + Math.cos(camYaw) * CAM_DIST
   );
-  camera.position.copy(desiredCam);
+  camFree.copy(desiredCam);
+  camArm = undefined;
   camLook.set(player.position.x, player.position.y + 1.5, player.position.z);
-  camera.lookAt(camLook);
+  updateCameraRig(1);
 
   playing = true;
 
@@ -537,9 +541,10 @@ function updatePlayer(dt, t) {
     player.position.y + CAM_HEIGHT + pitchLift,
     player.position.z + Math.cos(camYaw) * dist
   );
-  camera.position.lerp(desiredCam, 1 - Math.pow(0.001, dt));
+  const ease = 1 - Math.pow(0.001, dt);
+  camFree.lerp(desiredCam, ease);
   camLook.set(player.position.x, player.position.y + 1.5, player.position.z);
-  camera.lookAt(camLook);
+  updateCameraRig(ease);
 
   // Station proximity (live world positions)
   nearStation = null;
@@ -571,6 +576,8 @@ function updatePlayer(dt, t) {
     player: player.position.toArray(),
     camYaw,
     camPitch,
+    camera: camera.position.toArray(),
+    camDist: camera.position.distanceTo(camLook),
     joy: { ...joystick.vector, active: joystick.active },
     lookActive: lookPad.active,
     near: nearStation && nearStation.id,
@@ -587,6 +594,20 @@ function updatePlayer(dt, t) {
       return { id: s.id, pos: v.toArray(), d: player.position.distanceTo(v) };
     }),
   };
+}
+
+/** Spring arm: contain camFree against the hall and wall colliders, then aim at camLook. */
+function updateCameraRig(ease) {
+  if (!COLLISION_ON) {
+    camera.position.copy(camFree);
+    camera.lookAt(camLook);
+    return;
+  }
+  const clearance = armClearance(collision, camLook, camFree);
+  camArm = stepArm(camArm, clearance.allowed, ease);
+  const p = placeCamera(camLook, camFree, clearance, camArm, HALL);
+  camera.position.set(p.x, p.y, p.z);
+  camera.lookAt(camLook);
 }
 
 function approachAngle(a, b, t) {

@@ -35,6 +35,19 @@ nginx has an SPA fallback: a missing GLB returns `200 text/html`, so always chec
 
 After a successful deploy: tag `v0.3.1`, then mirror `dist/` to `gh-pages` (preserve `PLAN.md`, `CHECKLIST.md`, `.nojekyll`).
 
+## v0.4.1 (S3 camera containment) — live rollout
+
+Merging the S3 PR to `gh-pages` does **not** update https://stream.revioai.bot/ by itself; the live deploy is a separate box step
+(`infra/do/deploy-web-poc.sh`, steps above). After it, verify `curl -s https://stream.revioai.bot/version.json` shows `0.4.1`, then:
+
+```bash
+EB_URL=https://stream.revioai.bot/ node scripts-qa-camera.mjs      # E7, V11, no-pumping, spawn framing
+EB_URL=https://stream.revioai.bot/ node scripts-qa-collision.mjs   # unchanged S2 acceptance
+```
+
+The orbit camera is now a spring arm (`src/camera-rig.js`): a horizontal swept-sphere ray (r 0.25) from the look target against
+`MASKS.camera` (the wall slabs), hall AABB inset 0.30, minimum 1.0 m from the look target. `?collision=0` also restores the legacy camera.
+
 ## v0.4.0 (S2 solid hall) — live rollout
 
 Merging the S2 PR to `gh-pages` does **not** update https://stream.revioai.bot/ by itself: production is served from the droplet's `dist/`
@@ -45,4 +58,4 @@ shows `0.4.0`, then run the collision acceptance against live:
 EB_URL=https://stream.revioai.bot/ node scripts-qa-collision.mjs
 ```
 
-Known gap until S3: the orbit camera is still uncontained, so standing at a wall and yawing the camera outward can show the outside of the hall.
+Known gap closed in v0.4.1 (S3): the orbit camera was uncontained at walls.
