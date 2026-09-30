@@ -4,6 +4,21 @@ import {
   makeHangingBannerTexture,
   makeStationSign,
 } from './textures.js';
+import { LAYERS } from './collision.js';
+
+/**
+ * Hall shell inner faces (world metres). Wall meshes and wall colliders are both
+ * derived from these so visuals and collision cannot drift apart.
+ */
+export const HALL = { halfX: 17.5, zNorth: -16.9, zSouth: 17.5, height: 9 };
+
+const SOUTH_WALL_THICKNESS = 0.35;
+
+/** Marks a mesh as a blocking collider; `buildColliders()` derives the shape from the geometry. */
+function tagCollider(mesh, id, opts = {}) {
+  mesh.userData.collider = { id, layers: LAYERS.SOLID, shape: 'auto', ...opts };
+  return mesh;
+}
 
 /**
  * Photoreal-leaning Summit Expert Bar atrium for buy-in POC.
@@ -135,6 +150,15 @@ export function buildWorld(scene, textureLoader) {
   mkWall(0.35, 9, 36, -18.2, 4.5, 0);
   mkWall(0.35, 9, 36, 18.2, 4.5, 0);
 
+  // Plain matte south wall (no texture yet; skinned in a later slice). Inner face at HALL.zSouth.
+  const southWall = new THREE.Mesh(
+    new THREE.BoxGeometry(HALL.halfX * 2 + 1.75, HALL.height, SOUTH_WALL_THICKNESS),
+    new THREE.MeshStandardMaterial({ color: 0xd3d9e0, roughness: 0.95, metalness: 0 })
+  );
+  southWall.position.set(0, HALL.height / 2, HALL.zSouth + SOUTH_WALL_THICKNESS / 2);
+  southWall.receiveShadow = true;
+  scene.add(southWall);
+
   // Skylight photo strip
   const skyTex = load('./textures/skylight.jpg');
   const sky = new THREE.Mesh(
@@ -215,6 +239,7 @@ export function buildWorld(scene, textureLoader) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.5, 0.28), metal);
     leg.position.set(x, 1.75, z);
     leg.castShadow = true;
+    tagCollider(leg, `truss-${i}`, { shape: 'circle', radius: 0.3 });
     scene.add(leg);
     // Cross brace hint
     const brace = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, 0.08), metal);
@@ -236,6 +261,7 @@ export function buildWorld(scene, textureLoader) {
   counter.position.set(0, 0.35, -2);
   counter.castShadow = true;
   counter.receiveShadow = true;
+  tagCollider(counter, 'dais');
   scene.add(counter);
 
   // Center column
@@ -245,6 +271,7 @@ export function buildWorld(scene, textureLoader) {
   );
   column.position.set(0, 1.1, -2);
   column.castShadow = true;
+  tagCollider(column, 'column');
   scene.add(column);
 
   // Hanging Summit banners (photo-composed)
@@ -323,20 +350,21 @@ export function buildWorld(scene, textureLoader) {
     color: 0xe4e8ee,
     roughness: 0.85,
   });
-  for (const [x, z] of [
+  [
     [-14, -14],
     [14, -14],
     [-14, 14],
     [14, 14],
-  ]) {
+  ].forEach(([x, z], i) => {
     const p = new THREE.Mesh(new THREE.BoxGeometry(1.1, 7, 1.1), pillarMat);
     p.position.set(x, 3.5, z);
     p.castShadow = true;
     p.receiveShadow = true;
+    tagCollider(p, `pillar-${i}`, { layers: LAYERS.SOLID | LAYERS.CAMERA });
     scene.add(p);
-  }
+  });
 
-  return { stations, bounds: 15, ringHero };
+  return { stations, ringHero };
 }
 
 function buildStation(scene, textureLoader, cfg) {
@@ -355,6 +383,7 @@ function buildStation(scene, textureLoader, cfg) {
   desk.position.y = 0.52;
   desk.castShadow = true;
   desk.receiveShadow = true;
+  tagCollider(desk, `desk-${cfg.id}`);
   group.add(desk);
 
   const faceTex = textureLoader.load('./textures/summit-mountain.jpg');

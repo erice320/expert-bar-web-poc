@@ -5,6 +5,8 @@
  * yawOffset (rad): app expects +Z forward; tune per asset (0, Math.PI, ±Math.PI/2).
  * skinned: false for static meshes (procedural bob/sway instead of a rig).
  * walkClipSpeed: ground speed (m/s) the walk clip was authored for.
+ * footprint (props): floor footprint in metres { w (local X), d (local Z), shape } used for the
+ * collider registered per placed instance; declared here so it does not depend on the async mesh.
  * Remove an entry (or leave the file absent) to keep the billboard/no prop for that slot.
  */
 export const CHARACTER_SLOTS = {
@@ -15,6 +17,6 @@ export const CHARACTER_SLOTS = {
 };
 
 export const PROP_SLOTS = {
-  'PROP-CHAIR': { url: './models/props/lounge-chair.glb', height: 0.85, yawOffset: 0 },
-  'PROP-PLANTER': { url: './models/props/planter.glb', height: 1.3, yawOffset: 0 },
+  'PROP-CHAIR': { url: './models/props/lounge-chair.glb', height: 0.85, yawOffset: 0, footprint: { w: 0.78, d: 0.86, shape: 'obb' } },
+  'PROP-PLANTER': { url: './models/props/planter.glb', height: 1.3, yawOffset: 0, footprint: { w: 0.6, d: 0.56, shape: 'circle' } },
 };

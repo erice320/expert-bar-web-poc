@@ -34,3 +34,15 @@ nginx has an SPA fallback: a missing GLB returns `200 text/html`, so always chec
 `wrangler.jsonc` in this repo is an alternative static-assets target (Cloudflare Workers, `./dist`, SPA fallback); it is not the production path.
 
 After a successful deploy: tag `v0.3.1`, then mirror `dist/` to `gh-pages` (preserve `PLAN.md`, `CHECKLIST.md`, `.nojekyll`).
+
+## v0.4.0 (S2 solid hall) — live rollout
+
+Merging the S2 PR to `gh-pages` does **not** update https://stream.revioai.bot/ by itself: production is served from the droplet's `dist/`
+via `infra/do/deploy-web-poc.sh` on the box (steps above). After that deploy, verify `curl -s https://stream.revioai.bot/version.json`
+shows `0.4.0`, then run the collision acceptance against live:
+
+```bash
+EB_URL=https://stream.revioai.bot/ node scripts-qa-collision.mjs
+```
+
+Known gap until S3: the orbit camera is still uncontained, so standing at a wall and yawing the camera outward can show the outside of the hall.
