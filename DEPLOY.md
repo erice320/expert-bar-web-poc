@@ -35,6 +35,18 @@ nginx has an SPA fallback: a missing GLB returns `200 text/html`, so always chec
 
 After a successful deploy: tag `v0.3.1`, then mirror `dist/` to `gh-pages` (preserve `PLAN.md`, `CHECKLIST.md`, `.nojekyll`).
 
+## v0.4.2 (S5 Expert Bar centerpiece) — live rollout
+
+Merging the S5 PR to `gh-pages` does **not** update https://stream.revioai.bot/ by itself; the live deploy is a separate box step
+(`infra/do/deploy-web-poc.sh`, steps above). After it, verify `curl -s https://stream.revioai.bot/version.json` shows `0.4.2`, then:
+
+```bash
+EB_URL=https://stream.revioai.bot/ EB_ONLY=E1 node scripts-qa-collision.mjs
+```
+
+The crossed hero photo planes are gone; the bar centerpiece is a canvas-textured fascia band (open cylinder, r 3.3 m, inside the dais footprint).
+Truss/column/pole metalness is capped at 0.2. `expert-bar-hero-solid.jpg` and `ring-band.jpg` are no longer shipped.
+
 ## v0.4.1 (S3 camera containment) — live rollout
 
 Merging the S3 PR to `gh-pages` does **not** update https://stream.revioai.bot/ by itself; the live deploy is a separate box step
