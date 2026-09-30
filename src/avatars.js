@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CHARACTER_SLOTS, PROP_SLOTS } from './models/manifest.js';
 import { instantiate } from './models/loader.js';
+import { LAYERS, circle, obb } from './collision.js';
 
 /** Avatar presets matching GAMEPLAY_OTS_v02 AV-A–D spirit */
 export const AVATARS = [
@@ -428,18 +429,46 @@ export function upgradeAvatar(group, preset, statusKey = preset.id) {
   });
 }
 
+let propColliderSeq = 0;
+const _propPos = new THREE.Vector3();
+const _propQuat = new THREE.Quaternion();
+const _propScale = new THREE.Vector3();
+const _propDir = new THREE.Vector3();
+
+function propCollider(key, slot, o) {
+  const fp = slot.footprint;
+  if (!fp) return null;
+  o.updateWorldMatrix(true, false);
+  o.matrixWorld.decompose(_propPos, _propQuat, _propScale);
+  _propDir.set(0, 0, 1).applyQuaternion(_propQuat);
+  const yaw = Math.atan2(_propDir.x, _propDir.z);
+  const opts = {
+    id: `${key}#${propColliderSeq++}`,
+    layers: LAYERS.PROP,
+    yMin: 0,
+    yMax: slot.height,
+    tag: key,
+  };
+  if (fp.shape === 'circle') return circle(_propPos.x, _propPos.z, Math.max(fp.w, fp.d) / 2, opts);
+  return obb(_propPos.x, _propPos.z, fp.w / 2, fp.d / 2, yaw, opts);
+}
+
 /**
  * placements: [{ parent, x, z, faceX, faceZ }] in the parent's local space.
- * Missing/failed asset => props simply absent.
+ * Missing/failed asset => props simply absent, and no collider is registered.
+ * `collisionWorld` (optional ColliderWorld) receives one collider per placed instance.
  */
-export function placeProps(key, placements) {
-  return instantiate(key, PROP_SLOTS[key]).then((res) => {
+export function placeProps(key, placements, collisionWorld) {
+  const slot = PROP_SLOTS[key];
+  return instantiate(key, slot).then((res) => {
     if (!res) return;
     placements.forEach((p, i) => {
       const o = i === 0 ? res.object : res.object.clone(true);
       o.position.set(p.x, 0, p.z);
       o.rotation.y = Math.atan2(p.faceX - p.x, p.faceZ - p.z);
       p.parent.add(o);
+      const c = collisionWorld && propCollider(key, slot, o);
+      if (c) collisionWorld.add(c);
     });
   });
 }

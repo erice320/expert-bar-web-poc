@@ -3,7 +3,10 @@ import { AVATARS, createAvatarMesh, animateWalk, upgradeAvatar, placeProps } fro
 import { CHARACTER_SLOTS } from './models/manifest.js';
 import { modelStatus, preload, tickMixers } from './models/loader.js';
 import { Joystick, Keyboard, DPad, LookPad } from './joystick.js';
-import { buildWorld } from './world.js';
+import { buildWorld, HALL } from './world.js';
+import { ColliderWorld, PLAYER } from './collision.js';
+import { buildColliders } from './colliders.js';
+import { createColliderDebug } from './collider-debug.js';
 import { getStationPlaylist, embedUrl } from './station-videos.js';
 
 const canvas = document.getElementById('c');
@@ -25,6 +28,13 @@ const panelClose = document.getElementById('panel-close');
 let activePlaylist = null;
 let activeVideoIndex = 0;
 
+const qs = new URLSearchParams(location.search);
+/** ?collision=0 restores the pre-collision movement (square clamp) for A/B comparison and rollback only. */
+const COLLISION_ON = qs.get('collision') !== '0';
+const DEBUG_MODE = qs.get('debug');
+const LEGACY_BOUNDS = 15;
+const WALK_SPEED = 3.6;
+
 const VERSION = __APP_VERSION__;
 console.info(`[eb] Expert Bar v${VERSION}`);
 const hostBadge = document.getElementById('host-badge');
@@ -42,7 +52,9 @@ let playerPreset = null;
 let playerDisplayName = '';
 let stations = [];
 let npcs = [];
-let bounds = 15;
+const collision = new ColliderWorld();
+let colliderDebug = null;
+let playerVy = 0;
 let nearStation = null;
 let playing = false;
 
@@ -296,7 +308,10 @@ function startGame() {
 
   const world = buildWorld(scene, textureLoader);
   stations = world.stations;
-  bounds = world.bounds;
+
+  collision.clear();
+  for (const c of buildColliders(scene)) collision.add(c);
+  if (DEBUG_MODE === 'colliders') colliderDebug = createColliderDebug(scene, collision);
 
   player = createAvatarMesh(playerPreset, { label: true, displayName: playerDisplayName, textureLoader });
   player.position.set(0, 0, 10);
@@ -342,8 +357,26 @@ function startGame() {
 
   window.__ebTeleport = (x, z) => {
     if (!player) return;
-    player.position.set(x, 0, z);
+    if (!COLLISION_ON) {
+      player.position.set(x, 0, z);
+      return;
+    }
+    const inset = PLAYER.radius;
+    const cx = THREE.MathUtils.clamp(x, -HALL.halfX + inset, HALL.halfX - inset);
+    const cz = THREE.MathUtils.clamp(z, HALL.zNorth + inset, HALL.zSouth - inset);
+    playerVy = 0;
+    // A zero-delta resolve without dt snaps y to the ground and pushes out of any collider.
+    const out = collision.resolveMove({ x: cx, y: 0, z: cz }, { x: 0, z: 0 });
+    player.position.set(out.pos.x, out.pos.y, out.pos.z);
+    colliderDebug?.update(out.contacts, player.position);
   };
+
+  if (DEBUG_MODE === '1' || DEBUG_MODE === 'colliders') {
+    window.__ebLook = (yaw, pitch) => {
+      camYaw = yaw;
+      if (pitch !== undefined) camPitch = THREE.MathUtils.clamp(pitch, PITCH_MIN, PITCH_MAX);
+    };
+  }
 }
 
 function placeHallProps(world) {
@@ -355,14 +388,15 @@ function placeHallProps(world) {
       [4.15, -3.11],
       [-4.15, -0.89],
       [-4.15, -3.11],
-    ].map(([x, z]) => ({ parent: scene, x, z, ...chairFace }))
+    ].map(([x, z]) => ({ parent: scene, x, z, ...chairFace })),
+    collision
   ).catch(() => {});
   const planters = [];
   for (const st of world.stations) {
     if (st.id !== 'A' && st.id !== 'D') continue;
     for (const x of [-1.75, 1.75]) planters.push({ parent: st.group, x, z: -0.35, faceX: x, faceZ: 0.65 });
   }
-  placeProps('PROP-PLANTER', planters).catch(() => {});
+  placeProps('PROP-PLANTER', planters, collision).catch(() => {});
 }
 
 function circlePath(cx, cz, r, dir) {
@@ -467,22 +501,33 @@ function updatePlayer(dt, t) {
   rightFlat.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
 
   const moving = Math.hypot(ix, iy) > 0.08;
+  let moveX = 0;
+  let moveZ = 0;
   if (moving) {
     moveDir.set(0, 0, 0);
     moveDir.addScaledVector(rightFlat, ix);
     moveDir.addScaledVector(forwardFlat, -iy);
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize();
-      const speed = 3.6;
-      player.position.addScaledVector(moveDir, speed * dt);
-      player.position.x = THREE.MathUtils.clamp(player.position.x, -bounds, bounds);
-      player.position.z = THREE.MathUtils.clamp(player.position.z, -bounds, bounds);
+      moveX = moveDir.x * WALK_SPEED * dt;
+      moveZ = moveDir.z * WALK_SPEED * dt;
       // Face move direction (visual only — does NOT drive camera)
       const targetYaw = Math.atan2(moveDir.x, moveDir.z);
       player.rotation.y = approachAngle(player.rotation.y, targetYaw, 0.2);
     }
   }
-  animateWalk(player, moving, t, moving ? 3.6 : 0);
+  let contacts = [];
+  if (COLLISION_ON) {
+    const out = collision.resolveMove(player.position, { x: moveX, z: moveZ }, { dt, vy: playerVy });
+    player.position.set(out.pos.x, out.pos.y, out.pos.z);
+    playerVy = out.vy;
+    contacts = out.contacts;
+  } else {
+    player.position.x = THREE.MathUtils.clamp(player.position.x + moveX, -LEGACY_BOUNDS, LEGACY_BOUNDS);
+    player.position.z = THREE.MathUtils.clamp(player.position.z + moveZ, -LEGACY_BOUNDS, LEGACY_BOUNDS);
+  }
+  colliderDebug?.update(contacts, player.position);
+  animateWalk(player, moving, t, moving ? WALK_SPEED : 0);
 
   // Independent OTS orbit: behind player by camYaw / camPitch (NOT player.rotation.y)
   const pitchLift = Math.sin(camPitch) * 1.2;
@@ -529,6 +574,9 @@ function updatePlayer(dt, t) {
     joy: { ...joystick.vector, active: joystick.active },
     lookActive: lookPad.active,
     near: nearStation && nearStation.id,
+    get collision() {
+      return { enabled: COLLISION_ON, ...collision.snapshot(player.position.y) };
+    },
     version: VERSION,
     models: { ...modelStatus },
     tris: renderer.info.render.triangles,
