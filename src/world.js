@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   makeBannerTexture,
+  makeFasciaTexture,
   makeHangingBannerTexture,
   makeStationSign,
 } from './textures.js';
@@ -175,62 +176,57 @@ export function buildWorld(scene, textureLoader) {
   sky.position.set(0, 8.6, -2);
   scene.add(sky);
 
-  // --- Expert Bar: photo hero plate (buy-in fidelity centerpiece) ---
-  const ringHeroTex = sRGB(textureLoader.load('./textures/expert-bar-hero-solid.jpg'));
-  const ringHero = new THREE.Mesh(
-    new THREE.PlaneGeometry(12, 8.3),
-    new THREE.MeshBasicMaterial({
-      map: ringHeroTex,
-      transparent: true,
-      opacity: 0.98,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-    })
-  );
-  ringHero.position.set(0, 3.9, -3.2);
-  ringHero.renderOrder = 1;
-  scene.add(ringHero);
-  // Cross plate for orbit readability
-  const ringHeroB = new THREE.Mesh(
-    new THREE.PlaneGeometry(12, 8.3),
-    new THREE.MeshBasicMaterial({
-      map: ringHeroTex,
-      transparent: true,
-      opacity: 0.9,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-    })
-  );
-  ringHeroB.position.set(0, 3.9, -3.2);
-  ringHeroB.rotation.y = Math.PI / 2;
-  ringHeroB.renderOrder = 1;
-  scene.add(ringHeroB);
-
-  // Thin metallic accent ring (subtle, under photo plate)
-  const ringBandTex = load('./textures/ring-band.jpg');
-  ringBandTex.wrapS = THREE.RepeatWrapping;
-  ringBandTex.repeat.set(4, 1);
+  // --- Expert Bar fascia: open cylinder band above the dais, inside its footprint ---
+  const FASCIA = { radius: 3.3, height: 0.7, centerY: 2.9, repeat: 3 };
+  const fasciaTex = new THREE.CanvasTexture(makeFasciaTexture());
+  fasciaTex.colorSpace = THREE.SRGBColorSpace;
+  fasciaTex.wrapS = THREE.RepeatWrapping;
+  fasciaTex.repeat.set(FASCIA.repeat, 1);
+  fasciaTex.anisotropy = 8;
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(5.5, 0.12, 10, 64),
-    new THREE.MeshStandardMaterial({
-      map: ringBandTex,
-      color: 0xffffff,
-      roughness: 0.3,
-      metalness: 0.65,
-      transparent: true,
-      opacity: 0.85,
+    new THREE.CylinderGeometry(FASCIA.radius, FASCIA.radius, FASCIA.height, 96, 1, true),
+    new THREE.MeshBasicMaterial({
+      map: fasciaTex,
+      alphaTest: 0.5,
+      side: THREE.FrontSide,
+      fog: false,
     })
   );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.set(0, 3.4, -2);
-  ring.castShadow = true;
+  ring.name = 'expert-bar-fascia';
+  ring.position.set(0, FASCIA.centerY, -2);
+  ring.castShadow = false;
+  ring.receiveShadow = false;
   scene.add(ring);
+
+  const fasciaLining = new THREE.Mesh(
+    new THREE.CylinderGeometry(FASCIA.radius - 0.01, FASCIA.radius - 0.01, FASCIA.height, 96, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x15283f, roughness: 0.7, metalness: 0.05, side: THREE.BackSide })
+  );
+  fasciaLining.position.copy(ring.position);
+  scene.add(fasciaLining);
+
+  const hangerMat = new THREE.MeshStandardMaterial({ color: 0xc8ced6, roughness: 0.5, metalness: 0.2 });
+  const hangerBottom = 0.7;
+  const hangerTop = FASCIA.centerY - FASCIA.height / 2;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const hanger = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, hangerTop - hangerBottom, 8),
+      hangerMat
+    );
+    hanger.position.set(
+      Math.cos(a) * (FASCIA.radius - 0.15),
+      (hangerTop + hangerBottom) / 2,
+      Math.sin(a) * (FASCIA.radius - 0.15) - 2
+    );
+    scene.add(hanger);
+  }
 
   // Truss legs (metallic)
   const metal = new THREE.MeshStandardMaterial({
     color: 0xd0d6dc,
-    roughness: 0.32,
-    metalness: 0.8,
+    roughness: 0.45,
+    metalness: 0.2,
   });
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
@@ -267,7 +263,7 @@ export function buildWorld(scene, textureLoader) {
   // Center column
   const column = new THREE.Mesh(
     new THREE.CylinderGeometry(0.45, 0.55, 2.2, 16),
-    new THREE.MeshStandardMaterial({ color: 0xc8ced6, roughness: 0.4, metalness: 0.6 })
+    new THREE.MeshStandardMaterial({ color: 0xc8ced6, roughness: 0.45, metalness: 0.2 })
   );
   column.position.set(0, 1.1, -2);
   column.castShadow = true;
@@ -298,7 +294,7 @@ export function buildWorld(scene, textureLoader) {
     scene.add(b);
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.03, 0.03, 1.4),
-      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7, roughness: 0.35 })
+      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.2, roughness: 0.45 })
     );
     pole.position.set(x, y + 1.9, z);
     scene.add(pole);
@@ -364,7 +360,7 @@ export function buildWorld(scene, textureLoader) {
     scene.add(p);
   });
 
-  return { stations, ringHero };
+  return { stations, ring };
 }
 
 function buildStation(scene, textureLoader, cfg) {

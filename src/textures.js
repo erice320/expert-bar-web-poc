@@ -36,6 +36,50 @@ export function makeBannerTexture({ title = 'EXPERT BAR', subtitle = '', w = 102
   return c;
 }
 
+/**
+ * Fascia band for the Expert Bar. One tile holds the full legend and is seamless at both edges,
+ * so it can be tiled with an integer `repeat` around an open cylinder. Margins above/below the
+ * panel are fully transparent (alpha), the panel itself is opaque so the band can use alphaTest
+ * instead of blended transparency (no sort flicker while orbiting).
+ */
+export function makeFasciaTexture({ w = 2560, h = 256, text = 'EXPERT BAR \u00B7 revio SUMMIT' } = {}) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  const margin = Math.round(h * 0.08);
+  const panelTop = margin;
+  const panelH = h - margin * 2;
+
+  const g = ctx.createLinearGradient(0, panelTop, 0, panelTop + panelH);
+  g.addColorStop(0, '#0B2A4A');
+  g.addColorStop(1, '#15283F');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, panelTop, w, panelH);
+
+  ctx.fillStyle = '#34BDE5';
+  const rule = Math.round(h * 0.035);
+  ctx.fillRect(0, panelTop, w, rule);
+  ctx.fillRect(0, panelTop + panelH - rule, w, rule);
+
+  let size = Math.floor(panelH * 0.52);
+  const font = (px) => `700 ${px}px system-ui,"Segoe UI",Arial,sans-serif`;
+  ctx.font = font(size);
+  const maxW = w * 0.86;
+  const measured = ctx.measureText(text).width;
+  if (measured > maxW) {
+    size = Math.floor(size * (maxW / measured));
+    ctx.font = font(size);
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#F5F9FF';
+  ctx.fillText(text, w / 2, panelTop + panelH / 2 + size * 0.04);
+  return c;
+}
+
 function drawPeak(ctx, cx, baseY, width, height, shadow, lit) {
   ctx.beginPath();
   ctx.moveTo(cx - width / 2, baseY);
